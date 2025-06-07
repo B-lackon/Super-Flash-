@@ -108,3 +108,8 @@ Reliability:
 - Continuity of operation even with 40% of files lost
 
 - Automatic recovery from crashes
+"pyinstaller--onefile --noconsole
+
+--icon-drive.ico --add-data "drive.ico;."
+
+--uac-admin backup_script.py"
